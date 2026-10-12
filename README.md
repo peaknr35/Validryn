@@ -134,15 +134,24 @@ A Git worktree isolates the source checkout but is **not** a security sandbox. U
 
 ```text
 validryn/
-├── fixtures/
-│   └── broken_calculator/
-├── scripts/
-├── src/
-│   └── failing_test_agent/
-├── tests/
-├── pyproject.toml
-└── README.md
+├── CLAUDE.md               entry point: where things live, where to go for a task
+├── CONTEXT.md              the pipeline on one screen, and how to read a run
+├── workflow/               the pipeline as contracts
+│   ├── _shared/            rules every stage obeys
+│   ├── 01_create/ … 04_diagnose/
+│   └── planned.md          stages not built yet
+├── src/failing_test_agent/
+│   ├── cli.py              the `fta` command
+│   ├── stages/             one module per stage
+│   ├── execution/          running Pytest under limits
+│   └── core/               models, database, hashing, state transitions
+├── tests/                  one file per stage
+├── fixtures/               sample project and canned model output
+├── scripts/                setup helpers
+└── docs/                   architecture and background
 ```
+
+The layout follows the Interpretable Context Methodology: every folder has a `CONTEXT.md` stating its one job, what it reads and what it writes, so a person or a model can find their way from `CLAUDE.md` in two or three reads. The contracts in `workflow/` describe each stage; the code in `src/` enforces it.
 
 The Python package and CLI still use the temporary `failing_test_agent` and `fta` names. They will be migrated carefully after the V1 execution contracts are stable.
 
