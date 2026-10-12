@@ -90,7 +90,7 @@ def intended_node_ids(pytest_args: list[str]) -> list[str]:
     ]
 
 
-def _matches(node_id: str, intended: str) -> bool:
+def node_matches(node_id: str, intended: str) -> bool:
     # A class or parametrized function is named by a prefix of its node IDs.
     return node_id == intended or node_id.startswith((intended + "[", intended + "::"))
 
@@ -99,7 +99,7 @@ def intended_tests_executed(intended: list[str], cases: list[CaseResult]) -> boo
     executed = [case.node_id for case in cases if case.executed]
     if not intended:
         return bool(executed)
-    return all(any(_matches(node, target) for node in executed) for target in intended)
+    return all(any(node_matches(node, target) for node in executed) for target in intended)
 
 
 def classify(
@@ -146,6 +146,7 @@ class TrustedLocalBackend:
     """
 
     name = "trusted-local"
+    sandboxed = False
 
     def __init__(self) -> None:
         self._lock = threading.Lock()

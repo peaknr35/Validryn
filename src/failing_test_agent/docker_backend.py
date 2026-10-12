@@ -11,6 +11,7 @@ class DockerBackend:
     """Container execution backend. Interface only: `run` is not implemented yet."""
 
     name = "docker"
+    sandboxed = True
 
     def available(self) -> bool:
         if shutil.which("docker") is None:

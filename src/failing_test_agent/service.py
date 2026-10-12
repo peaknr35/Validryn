@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 from .atomic import atomic_write_json, atomic_write_text
-from .db import Database
+from .db import Database, insert_artifact, insert_event
 from .errors import CommandValidationError
 from .hashing import sha256_file
 from .models import CreatedRun, RunEvent, RunManifest
@@ -45,11 +45,13 @@ def create_run(
     test_command: str,
     home: Path,
     worktree_creator: WorktreeCreator | None = None,
+    regression_command: str | None = None,
 ) -> CreatedRun:
     repo = repository_root(repo_path)
     require_clean_repository(repo)
     base_commit = head_commit(repo)
     test_argv = parse_test_command(test_command)
+    regression_argv = parse_test_command(regression_command) if regression_command else None
     run_id = _new_id("run")
     attempt_id = _new_id("attempt")
     run_dir = home.resolve() / "runs" / run_id
@@ -70,6 +72,7 @@ def create_run(
             repository_path=str(repo),
             base_commit=base_commit,
             test_argv=test_argv,
+            regression_argv=regression_argv,
         )
         run_event = RunEvent(
             event_id=_new_id("event"),
@@ -99,14 +102,15 @@ def create_run(
         with db.transaction() as connection:
             connection.execute(
                 """INSERT INTO runs
-                (id, repo_path, base_commit, test_argv_json, status,
-                 current_attempt_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (id, repo_path, base_commit, test_argv_json, regression_argv_json,
+                 status, current_attempt_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     run_id,
                     str(repo),
                     base_commit,
                     json.dumps(test_argv),
+                    json.dumps(regression_argv) if regression_argv else None,
                     "active",
                     attempt_id,
                     timestamp,
@@ -130,32 +134,16 @@ def create_run(
                 ),
             )
             for event in (run_event, attempt_event):
-                connection.execute(
-                    """INSERT INTO events
-                    (event_id, run_id, attempt_id, event_type, payload_json, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)""",
-                    (
-                        event.event_id,
-                        event.run_id,
-                        event.attempt_id,
-                        event.event_type,
-                        json.dumps(event.payload, sort_keys=True),
-                        event.created_at.isoformat(),
-                    ),
-                )
-            connection.execute(
-                """INSERT INTO artifacts
-                (id, run_id, attempt_id, kind, path, sha256, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    _new_id("artifact"),
-                    run_id,
-                    attempt_id,
-                    "manifest",
-                    str(manifest_path),
-                    manifest_hash,
-                    timestamp,
-                ),
+                insert_event(connection, event)
+            insert_artifact(
+                connection,
+                artifact_id=_new_id("artifact"),
+                run_id=run_id,
+                attempt_id=attempt_id,
+                kind="manifest",
+                path=manifest_path,
+                sha256=manifest_hash,
+                created_at=timestamp,
             )
     except BaseException:
         if worktree_created or worktree_path.exists():

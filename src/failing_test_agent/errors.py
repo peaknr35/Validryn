@@ -18,6 +18,10 @@ class CommandValidationError(FTAError):
     """The configured test command is outside the V1 contract."""
 
 
+class StateError(FTAError):
+    """A run or attempt is missing or not in a state that allows the operation."""
+
+
 class BackendUnavailableError(FTAError):
     """The selected execution backend cannot run commands on this machine."""
 

@@ -22,5 +22,10 @@ def atomic_write_text(path: Path, content: str) -> None:
         raise
 
 
+def atomic_append_text(path: Path, content: str) -> None:
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    atomic_write_text(path, existing + content)
+
+
 def atomic_write_json(path: Path, value: Any) -> None:
     atomic_write_text(path, json.dumps(value, indent=2, sort_keys=True) + "\n")

@@ -80,6 +80,8 @@ class ExecutionResult(BaseModel):
 
 class ExecutionBackend(Protocol):
     name: str
+    # False means repository code runs with the caller's own permissions.
+    sandboxed: bool
 
     def available(self) -> bool: ...
 

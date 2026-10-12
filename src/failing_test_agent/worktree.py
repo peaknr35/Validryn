@@ -38,6 +38,15 @@ def head_commit(repo: Path) -> str:
     return result.stdout.strip()
 
 
+def worktree_inventory(worktree: Path) -> dict[str, str]:
+    """Tracked changes plus untracked and ignored files; `git diff` alone misses the latter."""
+    diff = _git(worktree, "diff", "--binary", "--no-ext-diff", "HEAD")
+    status = _git(
+        worktree, "status", "--porcelain=v2", "--untracked-files=all", "--ignored=matching"
+    )
+    return {"diff": diff.stdout, "status": status.stdout}
+
+
 def create_detached_worktree(repo: Path, destination: Path, commit: str) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     result = _git(

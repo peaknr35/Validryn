@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
+
+from .models import RunEvent
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -55,6 +58,41 @@ CREATE TABLE IF NOT EXISTS artifacts (
 """
 
 
+def insert_event(connection: sqlite3.Connection, event: RunEvent) -> None:
+    connection.execute(
+        """INSERT INTO events
+        (event_id, run_id, attempt_id, event_type, payload_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)""",
+        (
+            event.event_id,
+            event.run_id,
+            event.attempt_id,
+            event.event_type,
+            json.dumps(event.payload, sort_keys=True),
+            event.created_at.isoformat(),
+        ),
+    )
+
+
+def insert_artifact(
+    connection: sqlite3.Connection,
+    *,
+    artifact_id: str,
+    run_id: str,
+    attempt_id: str | None,
+    kind: str,
+    path: Path,
+    sha256: str,
+    created_at: str,
+) -> None:
+    connection.execute(
+        """INSERT INTO artifacts
+        (id, run_id, attempt_id, kind, path, sha256, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (artifact_id, run_id, attempt_id, kind, str(path), sha256, created_at),
+    )
+
+
 class Database:
     def __init__(self, path: Path):
         self.path = path
@@ -69,8 +107,15 @@ class Database:
         return connection
 
     def initialize(self) -> None:
-        with self.connect() as connection:
+        connection = self.connect()
+        try:
             connection.executescript(SCHEMA)
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(runs)")}
+            if "regression_argv_json" not in columns:
+                connection.execute("ALTER TABLE runs ADD COLUMN regression_argv_json TEXT")
+            connection.commit()
+        finally:
+            connection.close()
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
