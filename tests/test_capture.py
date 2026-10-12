@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -16,7 +19,9 @@ from failing_test_agent.execution import ExecutionRequest, ExecutionResult
 from failing_test_agent.hashing import sha256_file
 from failing_test_agent.local_backend import TrustedLocalBackend
 from failing_test_agent.models import CreatedRun
+from failing_test_agent.liveness import process_start_token
 from failing_test_agent.service import create_run
+from failing_test_agent.stages import reconcile_lost_attempts
 
 TARGET = "pytest test_calculator.py::test_divide"
 
@@ -97,7 +102,9 @@ def test_capture_records_regression_baseline_per_test(clean_repo: Path, tmp_path
     assert capture.outcome == "captured"
     assert capture.regression_status == "captured"
     assert capture.regression.status == "tests_failed"
-    assert capture.regression.failing_node_ids == ["test_calculator.py::test_divide"]
+    # The suite includes the target; it must not be counted as a pre-existing regression failure.
+    assert capture.regression.failing_node_ids == []
+    assert capture.regression.excluded_target_node_ids == ["test_calculator.py::test_divide"]
     assert (
         capture.regression.command_environment_sha256
         != capture.target.command_environment_sha256
@@ -109,6 +116,77 @@ def test_capture_records_regression_baseline_per_test(clean_repo: Path, tmp_path
         "test_calculator.py::test_divide": "failed",
         "test_calculator.py::test_add": "passed",
     }
+
+
+def test_regression_baseline_keeps_failures_other_than_the_target(
+    make_repo, tmp_path: Path
+) -> None:
+    repo = make_repo(
+        {
+            "test_mixed.py": (
+                "def test_target():\n    assert False\n\n"
+                "def test_already_broken():\n    assert False\n\n"
+                "def test_fine():\n    assert True\n"
+            )
+        }
+    )
+    home = tmp_path / "home"
+    run = new_run(repo, home, test="pytest test_mixed.py::test_target", regression="pytest")
+
+    capture = capture_baseline(home, run.run_id, run.attempt_id, TrustedLocalBackend())
+
+    assert capture.regression.failing_node_ids == ["test_mixed.py::test_already_broken"]
+    assert capture.regression.excluded_target_node_ids == ["test_mixed.py::test_target"]
+
+
+def test_killed_stage_is_recovered_as_interrupted(clean_repo: Path, tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    run = new_run(clean_repo, home)
+    dead = subprocess.Popen([sys.executable, "-c", "pass"])
+    dead.wait()
+
+    def set_owner(pid: int, token: str | None) -> None:
+        connection = sqlite3.connect(home / "agent.db")
+        connection.execute(
+            "UPDATE attempts SET status = 'capturing', stage_pid = ?, stage_process_started = ?"
+            " WHERE id = ?",
+            (pid, token, run.attempt_id),
+        )
+        connection.commit()
+        connection.close()
+
+    # Owned by this live process: left alone.
+    set_owner(os.getpid(), process_start_token(os.getpid()))
+    assert reconcile_lost_attempts(home) == []
+    assert attempt_status(home, run.attempt_id) == "capturing"
+
+    # Same PID but a different start time means the PID was reused by another process.
+    set_owner(os.getpid(), "not-this-process")
+    assert reconcile_lost_attempts(home) == [run.attempt_id]
+    assert attempt_status(home, run.attempt_id) == "interrupted"
+
+    set_owner(dead.pid, "gone")
+    assert reconcile_lost_attempts(home) == [run.attempt_id]
+    assert attempt_status(home, run.attempt_id) == "interrupted"
+    assert event_types(home, run.run_id)[-1] == "attempt.interrupted"
+    last = (run.manifest_path.parent / "events.jsonl").read_text().splitlines()[-1]
+    assert json.loads(last)["payload"]["reason"] == "process_lost"
+
+
+def test_cli_recovers_lost_attempts_on_startup(clean_repo: Path, tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    run = new_run(clean_repo, home)
+    connection = sqlite3.connect(home / "agent.db")
+    connection.execute("UPDATE attempts SET status = 'capturing' WHERE id = ?", (run.attempt_id,))
+    connection.commit()
+    connection.close()
+
+    result = CliRunner().invoke(
+        app, ["attempt", "capture", run.run_id, run.attempt_id], env={"FTA_HOME": str(home)}
+    )
+
+    assert "marked interrupted" in result.output
+    assert attempt_status(home, run.attempt_id) == "interrupted"
 
 
 def test_target_that_passes_on_baseline_fails_the_attempt(clean_repo: Path, tmp_path: Path) -> None:
@@ -182,7 +260,7 @@ def test_attempt_cannot_be_captured_twice(clean_repo: Path, tmp_path: Path) -> N
     capture_baseline(home, run.run_id, run.attempt_id, TrustedLocalBackend())
     events_before = event_types(home, run.run_id)
 
-    with pytest.raises(StateError, match="only a `created` attempt"):
+    with pytest.raises(StateError, match="needs a `created` attempt"):
         capture_baseline(home, run.run_id, run.attempt_id, TrustedLocalBackend())
 
     assert attempt_status(home, run.attempt_id) == "captured"

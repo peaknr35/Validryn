@@ -37,6 +37,7 @@ def make_repo(tmp_path: Path) -> Callable[[dict[str, str]], Path]:
         git(repo, "config", "user.name", "FTA Test")
         git(repo, "config", "user.email", "fta@example.invalid")
         for relative, content in files.items():
+            (repo / relative).parent.mkdir(parents=True, exist_ok=True)
             (repo / relative).write_text(content)
         git(repo, "add", ".")
         git(repo, "commit", "-qm", "fixture")

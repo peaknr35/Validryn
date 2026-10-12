@@ -4,7 +4,7 @@
 
 Validryn is a workbench for auditable AI-assisted software investigation. It turns failing tests into reproducible investigation runs with isolated attempts, structured evidence, deterministic verification, and human approval.
 
-> **Project status:** Early V1 development. Validryn currently creates runs, executes Pytest through a trusted-local backend, and captures a baseline on the unpatched commit. It does not yet diagnose failures, generate patches, or execute untrusted repository code in a security sandbox.
+> **Project status:** Early V1 development. Validryn currently creates runs, executes Pytest through a trusted-local backend, captures a baseline on the unpatched commit, and retrieves a source-linked evidence bundle. It does not yet diagnose failures, generate patches, or execute untrusted repository code in a security sandbox.
 
 ## Why Validryn
 
@@ -67,21 +67,35 @@ Validryn is intentionally building this task loop before adding long-term memory
 
 - Runs the target test, and the regression command if one is configured, on the unpatched base commit.
 - Confirms the requested test actually ran and failed there.
-- Records which tests already fail before any patch exists.
+- Records which tests already fail before any patch exists. The target test is listed separately and left out of that set, so fixing the target is never counted as fixing a regression.
 - Checks that execution left the worktree unchanged.
 - Moves the attempt through an allowed-transition table and records hashed artifacts and events.
+
+**Exact retrieval** (`fta attempt retrieve`)
+
+- Reads the recorded baseline result (after re-checking its hash) instead of re-running tests.
+- Extracts the failing test, the traceback frames inside the repository, and the local symbols the test uses, located with Python's `ast`. Repository code is parsed, never imported or run.
+- Writes `evidence.json` and a readable `evidence.md`. Each item has an ID, a repository-relative path, a line range, the exact text, and a hash of that text.
+- Is deterministic: the bundle holds no timestamp, and equal inputs give equal evidence.
+- Is bounded: caps on items, lines per item, total bytes, and source file size, with a `truncated` flag.
+- Never reads outside the worktree: absolute paths, `..`, links that resolve elsewhere, `.git`, virtual environments, and binary files are skipped.
+
+**Recovery**
+
+- Ctrl+C or an error during a stage marks the attempt `interrupted` or `failed`.
+- Each in-progress stage records its process ID and start time. Every `fta` command first marks attempts whose process no longer exists as `interrupted` (reason `process_lost`).
 
 ## Not Implemented Yet
 
 The following capabilities are planned but should not be considered available:
 
 - Docker-based security isolation (the backend interface exists; `run` is not implemented).
-- Repository evidence retrieval.
+- Lexical or semantic search beyond exact retrieval.
 - LLM-generated diagnoses or patches.
 - Patch-policy enforcement.
 - Patched verification and per-test regression comparison.
 - Hash-bound human approval.
-- Attempt revision and recovery of attempts left mid-capture by a killed process.
+- Attempt revision: a failed or interrupted attempt cannot yet be retried within the same run.
 - Episodic memory retrieval.
 - Lesson proposal, validation, and promotion.
 
@@ -191,6 +205,16 @@ Without `--backend`, the command selects Docker and stops if Docker is unavailab
 
 A captured attempt has three files in `attempts/001/artifacts/`, each hashed and registered in SQLite: `baseline-target.json` and `baseline-regression.json` (full per-test results) and `baseline.json` (the summary). The command exits 0 when captured, 1 when the attempt failed, and 2 when it refused to start.
 
+### Retrieve evidence
+
+```powershell
+fta attempt retrieve RUN_ID ATTEMPT_ID
+```
+
+This needs a `captured` attempt whose worktree still matches the base commit, and moves it through `retrieving` to `retrieved`. It adds `evidence.json` and `evidence.md` to the attempt's `artifacts/` folder. For the calculator fixture the bundle holds two items: the `test_divide` function and the `divide` implementation it calls.
+
+Symbols that cannot be resolved produce a warning, not a failure. Retrieval fails only when the bundle could not be trusted, for example when the failing test cannot be found in the worktree.
+
 ### Drives without file ownership
 
 If the project sits on a FAT32 or exFAT drive, Git refuses to use repositories there until the folder is listed as safe:
@@ -210,8 +234,8 @@ pytest
 
 The remaining V1 increments, in order:
 
-1. Exact evidence retrieval from the attempt worktree.
-2. Fake diagnosis and patch outputs.
+1. Fake diagnosis output that cites evidence IDs, validated against the bundle.
+2. Fake patch output.
 3. Host-side patch validation and application.
 4. Patched verification with per-test outcome comparison.
 5. Hash-bound review and approval.
@@ -243,8 +267,9 @@ Validryn must never silently fall back from isolated execution to unsafe local e
 - [x] Trusted local fixture runner
 - [x] Machine-readable Pytest results
 - [x] Baseline verification
+- [x] Exact evidence retrieval
+- [x] Recovery of attempts whose process was killed
 - [ ] Restricted Docker execution
-- [ ] Evidence retrieval
 - [ ] Fake diagnosis and patch stages
 - [ ] Patch validation and policy enforcement
 - [ ] Patched-target and per-test regression comparison

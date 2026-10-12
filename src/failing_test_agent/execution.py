@@ -46,6 +46,15 @@ class ExecutionRequest(BaseModel):
         return self
 
 
+class FailureLocation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Relative to the Pytest root directory, forward slashes.
+    path: str
+    line: int
+    function: str
+
+
 class CaseResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -55,6 +64,9 @@ class CaseResult(BaseModel):
     executed: bool = False
     duration_seconds: float | None = None
     message: str | None = None
+    exception_type: str | None = None
+    # Traceback frames inside the repository, outermost first.
+    failure_locations: list[FailureLocation] = Field(default_factory=list)
 
 
 class ExecutionResult(BaseModel):

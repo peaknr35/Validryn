@@ -49,6 +49,12 @@ ATTEMPT_TRANSITIONS: dict[AttemptStatus, set[AttemptStatus]] = {
         AttemptStatus.FAILED,
         AttemptStatus.INTERRUPTED,
     },
+    AttemptStatus.CAPTURED: {AttemptStatus.RETRIEVING},
+    AttemptStatus.RETRIEVING: {
+        AttemptStatus.RETRIEVED,
+        AttemptStatus.FAILED,
+        AttemptStatus.INTERRUPTED,
+    },
 }
 
 
@@ -90,6 +96,9 @@ class CommandCapture(BaseModel):
     intended_node_ids: list[str]
     intended_tests_executed: bool
     failing_node_ids: list[str]
+    # Regression only: nodes that are the target itself. They are left out of
+    # `failing_node_ids` so a fixed target is never counted as a fixed regression.
+    excluded_target_node_ids: list[str] = Field(default_factory=list)
     command_environment_sha256: str
     result_artifact: str
     result_sha256: str
@@ -115,6 +124,48 @@ class BaselineCapture(BaseModel):
     outcome: Literal["captured", "failed"]
     failure_reason: str | None
     created_at: datetime = Field(default_factory=utc_now)
+
+
+EvidenceKind = Literal["test_definition", "traceback_frame", "symbol_definition", "exact_match"]
+
+
+class EvidenceItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_id: str
+    kind: EvidenceKind
+    # Repository-relative, forward slashes.
+    path: str
+    start_line: int
+    end_line: int
+    # Lines start_line..end_line with LF endings; content_sha256 is over this text.
+    content: str
+    content_sha256: str
+    reason: str
+    related_node_id: str | None = None
+    symbol: str | None = None
+    # Lines inside this snippet that a traceback frame points at.
+    failure_lines: list[int] = Field(default_factory=list)
+    truncated: bool = False
+
+
+class EvidenceBundle(BaseModel):
+    """Source snippets relevant to a captured failure. Holds no timestamp, so equal inputs give equal bytes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = 1
+    run_id: str
+    attempt_id: str
+    base_commit: str
+    baseline_target_sha256: str
+    retrieval_strategy: str = "exact-v1"
+    target_node_ids: list[str]
+    query_terms: list[str]
+    files_inspected: list[str]
+    evidence: list[EvidenceItem]
+    warnings: list[str]
+    truncated: bool = False
 
 
 class CreatedRun(BaseModel):

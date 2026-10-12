@@ -110,9 +110,15 @@ class Database:
         connection = self.connect()
         try:
             connection.executescript(SCHEMA)
-            columns = {row["name"] for row in connection.execute("PRAGMA table_info(runs)")}
-            if "regression_argv_json" not in columns:
-                connection.execute("ALTER TABLE runs ADD COLUMN regression_argv_json TEXT")
+            # Columns added after the first release; older databases gain them here.
+            for table, column, kind in (
+                ("runs", "regression_argv_json", "TEXT"),
+                ("attempts", "stage_pid", "INTEGER"),
+                ("attempts", "stage_process_started", "TEXT"),
+            ):
+                existing = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
+                if column not in existing:
+                    connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
             connection.commit()
         finally:
             connection.close()
