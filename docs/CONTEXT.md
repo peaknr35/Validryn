@@ -1,15 +1,16 @@
 # docs, background and direction
 
-One job: explain why Validryn is shaped the way it is. Nothing here is needed to run or change a stage.
+One job: explain why Validryn is shaped the way it is and where it is going. Nothing here is needed to run or change a built stage.
 
-| File | Holds |
-|---|---|
-| `architecture.md` | The long-term design: a knowledge plane (Cerebras-style retrieval), a workflow plane (ICM stage contracts) and a control plane (this code). Includes the build gates that decide when each further capability may be added. |
+| File | Holds | Read when |
+|---|---|---|
+| `architecture.md` | The whole design: knowledge plane, workflow plane, control plane, the learning loop, and the build gates. | deciding what to build next |
+| `knowledge-plane.md` | How evidence is found: exact retrieval today, and the Cerebras-style design (connectors, several search methods, fusion, reranking, project scopes) it grows into, with a gate for each level. | changing retrieval, or adding a source or search method |
 
 ## Sources the design draws on
 
 - Interpretable Context Methodology: Van Clief and McDermott, arXiv:2603.16021. The origin of the `workflow/` layout and the per-folder `CONTEXT.md` files.
-- "How Cerebras Built Its Enterprise Knowledge Base": https://www.cerebras.ai/blog/how-we-built-our-knowledge-base. The model for retrieval beyond exact extraction, not yet built.
+- "How Cerebras Built Its Enterprise Knowledge Base": https://www.cerebras.ai/blog/how-we-built-our-knowledge-base. Summarised and mapped onto Validryn in `knowledge-plane.md`. The article itself is not copied into this repository.
 
 ## Note
 

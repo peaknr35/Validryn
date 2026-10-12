@@ -10,14 +10,17 @@ One run investigates one failing test in one repository at one commit. A run has
 | 02 | capture | `fta attempt capture` | `captured` | `baseline-target.json`, `baseline-regression.json`, `baseline.json` | built |
 | 03 | retrieve | `fta attempt retrieve` | `retrieved` | `evidence.json`, `evidence.md` | built |
 | 04 | diagnose | `fta attempt diagnose` | `diagnosed` | `diagnosis.raw.txt`, `diagnosis.json`, `diagnosis.md` | built, fake provider only |
-| 05 | propose | | `patched` | | planned |
-| 06 | verify | | `verified` | | planned |
-| 07 | review | | `approved` / `rejected` | | planned |
-| 08 | record | | | | planned |
+| 05 | propose | `fta attempt propose` | `proposed` | `patch.raw.txt`, `patch.json`, `patch.md` | built, fake provider only |
+| 06 | apply | `fta attempt apply` | `applied` | `applied.diff`; the worktree now holds the patch | built |
+| 07 | verify | | `verified` | | planned |
+| 08 | review | | `approved` / `rejected` | | planned |
+| 09 | record | | | | planned |
 
 Each built stage has a contract in `workflow/NN_<stage>/CONTEXT.md`. Planned stages are described only in `workflow/planned.md`.
 
-A stage that is running holds an in-progress state (`capturing`, `retrieving`, `diagnosing`). It ends in its success state, or in `failed` or `interrupted`. A failed or interrupted attempt cannot yet be retried; start a new run.
+A stage that is running holds an in-progress state (`capturing`, `retrieving`, `diagnosing`, `proposing`, `applying`). It ends in its success state, or in `failed` or `interrupted`. A failed or interrupted attempt cannot yet be retried; start a new run (retry within a run is described in `workflow/planned.md`).
+
+Until stage 06 the worktree is exactly the base commit. After it, the worktree holds the patch, uncommitted.
 
 ## Reading a run
 

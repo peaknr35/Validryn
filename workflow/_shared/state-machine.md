@@ -6,10 +6,9 @@ The single source for legal transitions is `ATTEMPT_TRANSITIONS` in `src/failing
 
 ```text
 created ─▶ capturing ─▶ captured ─▶ retrieving ─▶ retrieved ─▶ diagnosing ─▶ diagnosed
-              │                        │                          │
-              └────────────┬───────────┴──────────────────────────┘
-                           ▼
-                   failed | interrupted
+        ─▶ proposing ─▶ proposed ─▶ applying ─▶ applied
+
+any in-progress state (…ing) ─▶ failed | interrupted
 ```
 
 - `failed`: the stage ran and its result was not acceptable, or it raised an error. The event carries a reason.

@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "diagnosis_sha256": "{{diagnosis_sha256}}",
+  "addresses_claim_id": "c2",
+  "rationale": "divide returns a * b. Dividing instead makes divide(8, 2) return 4, which is what test_divide asserts.",
+  "diff": "diff --git a/src/broken_calculator/__init__.py b/src/broken_calculator/__init__.py\n--- a/src/broken_calculator/__init__.py\n+++ b/src/broken_calculator/__init__.py\n@@ -1,2 +1,2 @@\n def divide(a: float, b: float) -> float:\n-    return a * b\n+    return a / b\n",
+  "expected_effects": ["tests/test_calculator.py::test_divide"],
+  "risks": ["divide(x, 0) now raises ZeroDivisionError where it used to return 0."]
+}

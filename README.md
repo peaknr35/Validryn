@@ -4,7 +4,7 @@
 
 Validryn is a workbench for auditable AI-assisted software investigation. It turns failing tests into reproducible investigation runs with isolated attempts, structured evidence, deterministic verification, and human approval.
 
-> **Project status:** Early V1 development. Validryn currently creates runs, executes Pytest through a trusted-local backend, captures a baseline on the unpatched commit, and retrieves a source-linked evidence bundle. It does not yet diagnose failures, generate patches, or execute untrusted repository code in a security sandbox.
+> **Project status:** Early V1 development. Validryn currently creates runs, executes Pytest through a trusted-local backend, captures a baseline on the unpatched commit, retrieves a source-linked evidence bundle, and validates and applies diagnoses and patches supplied as canned files. No model is connected yet, patched code is not yet re-tested, and untrusted repository code cannot yet be run in a security sandbox.
 
 ## Why Validryn
 
@@ -88,6 +88,14 @@ Validryn is intentionally building this task loop before adding long-term memory
 - It must either name a root-cause claim or abstain with an `unknown` claim saying what is missing.
 - The raw output is always kept and hashed. A valid diagnosis is also stored in canonical form with a readable copy. An invalid one fails the attempt with one error code per broken rule.
 
+**Patch proposal and application with a fake provider** (`fta attempt propose`, `fta attempt apply`)
+
+- Two separate steps, so a person can read an accepted proposal before anything touches the worktree.
+- The proposal must name the hash of the validated diagnosis and address its root-cause claim.
+- The diff is parsed and judged in Python before Git sees it. Version 1 allows only small modifications to existing files under `src/`: no test or configuration edits, no new, deleted or renamed files, no mode changes, binary patches or links, and limits on files and changed lines. Each rule has its own error code.
+- Applying uses `git apply` with no fuzz and no partial application, then reads the diff back from the worktree and checks it is the proposed change and nothing else. That read-back diff is stored as `applied.diff`.
+- A patch that fails to apply, or a process that dies part-way, leaves the worktree reset to the base commit. Nothing is ever committed or pushed.
+
 **Recovery**
 
 - Ctrl+C or an error during a stage marks the attempt `interrupted` or `failed`.
@@ -99,8 +107,7 @@ The following capabilities are planned but should not be considered available:
 
 - Docker-based security isolation (the backend interface exists; `run` is not implemented).
 - Lexical or semantic search beyond exact retrieval.
-- LLM-generated diagnoses (the stage accepts only canned input) and any patch generation.
-- Patch-policy enforcement.
+- LLM-generated diagnoses or patches (both stages accept only canned input).
 - Patched verification and per-test regression comparison.
 - Hash-bound human approval.
 - Attempt revision: a failed or interrupted attempt cannot yet be retried within the same run.
@@ -138,7 +145,7 @@ validryn/
 ├── CONTEXT.md              the pipeline on one screen, and how to read a run
 ├── workflow/               the pipeline as contracts
 │   ├── _shared/            rules every stage obeys
-│   ├── 01_create/ … 04_diagnose/
+│   ├── 01_create/ … 06_apply/
 │   └── planned.md          stages not built yet
 ├── src/failing_test_agent/
 │   ├── cli.py              the `fta` command
@@ -244,6 +251,22 @@ This needs a `retrieved` attempt and moves it through `diagnosing` to `diagnosed
 
 An evidence bundle's hash is unique to its attempt, so a canned file writes `{{evidence_bundle_sha256}}` where the hash belongs and the fake provider fills it in.
 
+### Propose and apply a canned patch
+
+```powershell
+fta attempt propose RUN_ID ATTEMPT_ID `
+  --provider fake `
+  --input .\fixtures\patches\broken_calculator.json
+
+fta attempt apply RUN_ID ATTEMPT_ID
+```
+
+`propose` needs a `diagnosed` attempt and moves it to `proposed`, or to `failed` (`invalid_proposal` or `policy_violation`). It writes `patch.raw.txt`, and for an accepted proposal `patch.json` and `patch.md`; the worktree is untouched. Read `patch.md` before applying.
+
+`apply` needs a `proposed` attempt and moves it to `applied`, or to `failed` (`apply_failed`) with the worktree reset. It writes `applied.diff`. Afterwards the attempt's worktree holds the patch, uncommitted; no tests have been run.
+
+Both commands exit 0 on success, 1 when the proposal or patch was rejected, and 2 when they refused to start.
+
 ### Drives without file ownership
 
 If the project sits on a FAT32 or exFAT drive, Git refuses to use repositories there until the folder is listed as safe:
@@ -263,12 +286,11 @@ pytest
 
 The remaining V1 increments, in order:
 
-1. Fake patch proposal with host-side patch-policy validation and application.
-2. Patched verification with per-test outcome comparison.
-3. Hash-bound review and approval.
-4. Real model provider.
+1. Patched verification with per-test outcome comparison.
+2. Hash-bound review and approval.
+3. Real model provider.
 
-The design behind this order is in [docs/architecture.md](docs/architecture.md).
+The design behind this order is in [docs/architecture.md](docs/architecture.md). How evidence retrieval is meant to grow beyond exact extraction is in [docs/knowledge-plane.md](docs/knowledge-plane.md).
 
 The Docker backend is implemented against the existing contract as soon as a container runtime is available.
 
@@ -299,9 +321,9 @@ Validryn must never silently fall back from isolated execution to unsafe local e
 - [x] Exact evidence retrieval
 - [x] Recovery of attempts whose process was killed
 - [x] Fake diagnosis stage with evidence-bound validation
+- [x] Fake patch proposal with patch-policy enforcement
+- [x] Patch application with read-back and rollback
 - [ ] Restricted Docker execution
-- [ ] Fake diagnosis and patch stages
-- [ ] Patch validation and policy enforcement
 - [ ] Patched-target and per-test regression comparison
 - [ ] Hash-bound review and approval
 - [ ] Real model integration

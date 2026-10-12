@@ -21,5 +21,7 @@ Dependencies point downward only. `core/` must not import from `execution/` or `
 | `workflow/02_capture` | `stages/capture.py` | `capture_baseline` |
 | `workflow/03_retrieve` | `stages/retrieve.py` | `retrieve_evidence` |
 | `workflow/04_diagnose` | `stages/diagnose.py` | `diagnose` |
+| `workflow/05_propose` | `stages/propose.py` | `propose_patch` |
+| `workflow/06_apply` | `stages/apply.py` | `apply_patch` |
 
 Open the subpackage `CONTEXT.md` for the folder you are changing; you rarely need more than one.

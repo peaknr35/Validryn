@@ -9,16 +9,17 @@ One job: acceptance tests, written against behaviour a contract promises.
 | `test_capture.py` | `workflow/02_capture`, plus recovery of attempts whose process was lost. |
 | `test_retrieval.py` | `workflow/03_retrieve`: what is extracted, containment inside the worktree, limits, determinism. |
 | `test_diagnosis.py` | `workflow/04_diagnose`: one rejection test per rule, raw output kept, injected instructions inert. |
+| `test_patch.py` | `workflow/05_propose` and `workflow/06_apply`: one rejection per policy rule, apply and read-back, rollback after a failed or interrupted apply, and that every error code is documented. |
 | `conftest.py` | `make_repo` (build a throwaway Git repository from a dict of files) and `clean_repo`. |
 
 ## Running
 
 ```powershell
-pytest                      # everything, about 80 seconds
+pytest                      # everything, about two minutes
 pytest tests/test_retrieval.py
 ```
 
-Two tests skip on this machine by design: the Docker integration test (no Docker) and the symlink test (needs Developer Mode or elevated rights).
+Three tests skip on a Windows machine without Docker or symlink rights: the Docker integration test and the two symlink tests (retrieval and patch policy). The junction tests cover the same escape on Windows.
 
 ## Conventions
 

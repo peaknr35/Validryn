@@ -26,6 +26,7 @@ Every folder has a `CONTEXT.md`. Read the one for the folder you are working in,
 | Add the next stage | `workflow/planned.md` | then `workflow/CONTEXT.md` for the stage pattern |
 | Find which module does what | `src/failing_test_agent/CONTEXT.md` | open one subpackage `CONTEXT.md` |
 | See the status of a run | `CONTEXT.md`, section "Reading a run" | look in `.fta/runs/<run_id>/` |
+| Change how evidence is found, or add a source | `docs/knowledge-plane.md` | then `workflow/03_retrieve/CONTEXT.md` |
 | Understand why it is built this way | `docs/architecture.md` | |
 
 ## Rules that always apply

@@ -6,6 +6,7 @@ One job: small, known inputs for tests and for trying the pipeline by hand.
 |---|---|
 | `broken_calculator/` | A tiny Python project whose `divide` multiplies. `tests/test_calculator.py::test_divide` fails. Plain files, deliberately not a Git repository. |
 | `diagnoses/broken_calculator.json` | A valid canned diagnosis for that project, for the fake provider. Uses `{{evidence_bundle_sha256}}` where the bundle hash belongs. |
+| `patches/broken_calculator.json` | A valid canned patch proposal that changes `a * b` to `a / b`. Uses `{{diagnosis_sha256}}` where the diagnosis hash belongs. |
 
 ## Using them
 
@@ -14,5 +15,5 @@ One job: small, known inputs for tests and for trying the pipeline by hand.
 ## Adding a fixture
 
 - A new sample project goes in its own folder beside `broken_calculator/`.
-- Canned provider output goes in a folder named for the stage that consumes it (`diagnoses/`, later `patches/`), named after the project it belongs to.
+- Canned provider output goes in a folder named for the stage that consumes it (`diagnoses/`, `patches/`), named after the project it belongs to.
 - Do not fix the bug in `broken_calculator/`. Tests depend on it failing.

@@ -10,6 +10,9 @@ from .execution.backends import select_backend
 from .stages.capture import capture_baseline
 from .stages.diagnose import FakeDiagnosisProvider, diagnose
 from .core.errors import CommandValidationError, FTAError
+from .stages.apply import apply_patch
+from .stages.propose import propose_patch
+from .stages.providers import FakePatchProvider
 from .stages.retrieve import retrieve_evidence
 from .stages.create import create_run
 from .core.lifecycle import reconcile_lost_attempts
@@ -175,6 +178,66 @@ def attempt_diagnose(
     typer.echo(f"Confidence:                  {diagnosis.confidence}")
     typer.echo("Diagnosis:                   artifacts/diagnosis.json")
     typer.echo("Attempt state:               diagnosed")
+
+
+@attempt_app.command("propose")
+def attempt_propose(
+    run_id: str,
+    attempt_id: str,
+    provider: str = typer.Option("fake", "--provider", help="Only `fake` exists so far."),
+    input_path: Path = typer.Option(
+        None, "--input", exists=True, dir_okay=False, help="Canned patch for the fake provider."
+    ),
+) -> None:
+    """Validate a proposed patch against patch policy and record it. Applies nothing."""
+    try:
+        if provider != "fake":
+            raise CommandValidationError(f"Unknown patch provider: {provider}")
+        if input_path is None:
+            raise CommandValidationError("The fake provider needs --input FILE.")
+        outcome = propose_patch(app_home(), run_id, attempt_id, FakePatchProvider(input_path))
+    except FTAError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    typer.echo(f"Provider:                    {outcome.provider}")
+    typer.echo(f"Proposal accepted:           {_yes_no(outcome.valid)}")
+    if not outcome.valid:
+        for problem in outcome.problems:
+            typer.echo(f"Problem [{problem.code}]: {problem.message}")
+        typer.echo("Raw output kept:             artifacts/patch.raw.txt")
+        typer.echo(f"Attempt state:               failed ({outcome.reason})")
+        raise typer.Exit(code=1)
+    for change in outcome.files:
+        typer.echo(f"File:                        {change.path} (+{change.added} -{change.removed})")
+    typer.echo(f"Addresses claim:             {outcome.proposal.addresses_claim_id}")
+    typer.echo(f"Expected to start passing:   {', '.join(outcome.proposal.expected_effects) or 'none stated'}")
+    for warning in outcome.warnings:
+        typer.echo(f"Warning:                     {warning}")
+    typer.echo("Proposal:                    artifacts/patch.json (read artifacts/patch.md)")
+    typer.echo("Worktree changed:            NO")
+    typer.echo("Attempt state:               proposed")
+
+
+@attempt_app.command("apply")
+def attempt_apply(run_id: str, attempt_id: str) -> None:
+    """Apply the recorded proposal to the attempt worktree. Never commits or pushes."""
+    try:
+        outcome = apply_patch(app_home(), run_id, attempt_id)
+    except FTAError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(f"Patch applied:               {_yes_no(outcome.applied)}")
+    if not outcome.applied:
+        typer.echo(f"Reason:                      {outcome.detail}")
+        typer.echo("Worktree:                    restored to the base commit")
+        typer.echo("Attempt state:               failed (apply_failed)")
+        raise typer.Exit(code=1)
+    typer.echo(f"Files changed:               {', '.join(outcome.files)}")
+    typer.echo("Matches the proposal:        YES")
+    typer.echo(f"Applied diff:                artifacts/applied.diff ({outcome.applied_diff_sha256})")
+    typer.echo("Tests run:                   NO (verification is a separate stage)")
+    typer.echo("Attempt state:               applied")
 
 
 if __name__ == "__main__":

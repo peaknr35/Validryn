@@ -8,6 +8,15 @@ One job: each module implements exactly one stage contract from `workflow/`.
 | `capture.py` | `workflow/02_capture` | the worktree, via an execution backend | baseline results and summary |
 | `retrieve.py` | `workflow/03_retrieve` | baseline target result, worktree source | evidence bundle |
 | `diagnose.py` | `workflow/04_diagnose` | evidence bundle, provider text | raw, canonical and readable diagnosis |
+| `propose.py` | `workflow/05_propose` | diagnosis, evidence, baseline results, provider text | raw, canonical and readable patch proposal |
+| `apply.py` | `workflow/06_apply` | patch proposal, worktree | the patched worktree and `applied.diff` |
+
+Supporting modules, not stages:
+
+| Module | Holds |
+|---|---|
+| `patch_policy.py` | The diff parser and `check_diff`, used by both `propose.py` and `apply.py`. Pure: reads the diff and the base commit, changes nothing. |
+| `providers.py` | The fake providers that return canned text where a model will later sit, and the only placeholder substitution in the codebase. |
 
 ## The shape of a stage function
 

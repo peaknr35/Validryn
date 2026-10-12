@@ -20,15 +20,13 @@ from ..core.errors import StateError
 from ..core.hashing import sha256_file
 from ..core.models import AttemptStatus, Diagnosis, EvidenceBundle
 from ..core.lifecycle import Recorder, load_current_attempt, stage_guard
+from .providers import BUNDLE_HASH_PLACEHOLDER, FakeDiagnosisProvider  # noqa: F401 (re-exported)
 
 MAX_RAW_BYTES = 200_000
 MAX_CLAIMS = 20
 MAX_STATEMENT_CHARS = 1000
 MAX_SUMMARY_CHARS = 2000
 MAX_QUOTE_CHARS = 500
-
-BUNDLE_HASH_PLACEHOLDER = "{{evidence_bundle_sha256}}"
-
 
 class DiagnosisProvider(Protocol):
     name: str
@@ -37,22 +35,9 @@ class DiagnosisProvider(Protocol):
         """Return the proposed diagnosis as raw text. It is parsed and validated by the caller."""
         ...
 
-
-class FakeDiagnosisProvider:
-    """Returns the contents of a file, standing in for a model.
-
-    Because an evidence bundle's hash is unique to its attempt, a canned file
-    may write `{{evidence_bundle_sha256}}` where the hash belongs.
-    """
-
-    name = "fake"
-
-    def __init__(self, input_path: Path) -> None:
-        self.input_path = input_path
-
-    def propose(self, bundle: EvidenceBundle, bundle_sha256: str) -> str:
-        raw = self.input_path.read_bytes().decode("utf-8", errors="replace")
-        return raw.replace(BUNDLE_HASH_PLACEHOLDER, bundle_sha256)
+    def provenance(self) -> dict[str, object]:
+        """How the last proposal was produced; recorded in the event log."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -215,7 +200,7 @@ def diagnose(
         # Kept exactly as returned, valid or not, so a rejected output can be inspected.
         recorder.record(
             "diagnosis.proposed",
-            {"provider": provider.name},
+            {"provider": provider.name, **provider.provenance()},
             artifact=("diagnosis_raw", "diagnosis.raw.txt", raw[: MAX_RAW_BYTES * 2]),
         )
         diagnosis, problems = validate_diagnosis(raw, bundle, bundle_sha256)

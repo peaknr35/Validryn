@@ -29,8 +29,10 @@ class AttemptStatus(StrEnum):
     RETRIEVED = "retrieved"
     DIAGNOSING = "diagnosing"
     DIAGNOSED = "diagnosed"
-    PATCHING = "patching"
-    PATCHED = "patched"
+    PROPOSING = "proposing"
+    PROPOSED = "proposed"
+    APPLYING = "applying"
+    APPLIED = "applied"
     VERIFYING = "verifying"
     VERIFIED = "verified"
     AWAITING_REVIEW = "awaiting_review"
@@ -58,6 +60,18 @@ ATTEMPT_TRANSITIONS: dict[AttemptStatus, set[AttemptStatus]] = {
     AttemptStatus.RETRIEVED: {AttemptStatus.DIAGNOSING},
     AttemptStatus.DIAGNOSING: {
         AttemptStatus.DIAGNOSED,
+        AttemptStatus.FAILED,
+        AttemptStatus.INTERRUPTED,
+    },
+    AttemptStatus.DIAGNOSED: {AttemptStatus.PROPOSING},
+    AttemptStatus.PROPOSING: {
+        AttemptStatus.PROPOSED,
+        AttemptStatus.FAILED,
+        AttemptStatus.INTERRUPTED,
+    },
+    AttemptStatus.PROPOSED: {AttemptStatus.APPLYING},
+    AttemptStatus.APPLYING: {
+        AttemptStatus.APPLIED,
         AttemptStatus.FAILED,
         AttemptStatus.INTERRUPTED,
     },
@@ -202,6 +216,24 @@ class Diagnosis(BaseModel):
     root_cause_claim_id: str | None
     confidence: Literal["low", "medium", "high"]
     abstain: bool = False
+
+
+class PatchProposal(BaseModel):
+    """A proposed change. Proposed by a provider, checked by `validate_proposal`, applied by a separate stage."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = 1
+    # Binds the patch to one validated diagnosis.
+    diagnosis_sha256: str
+    # Must be that diagnosis's root-cause claim.
+    addresses_claim_id: str
+    rationale: str = Field(min_length=1)
+    # Unified diff with a/ and b/ path prefixes and LF line endings.
+    diff: str
+    # Test node IDs expected to go from failing to passing.
+    expected_effects: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
 
 
 class CreatedRun(BaseModel):
