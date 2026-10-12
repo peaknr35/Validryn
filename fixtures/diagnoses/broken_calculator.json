@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "evidence_bundle_sha256": "{{evidence_bundle_sha256}}",
+  "summary": "divide multiplies its arguments instead of dividing them, so divide(8, 2) returns 16 rather than 4.",
+  "claims": [
+    {
+      "claim_id": "c1",
+      "kind": "fact",
+      "statement": "test_divide asserts that divide(8, 2) equals 4.",
+      "evidence_ids": ["ev_001"],
+      "quote": "assert divide(8, 2) == 4"
+    },
+    {
+      "claim_id": "c2",
+      "kind": "fact",
+      "statement": "divide returns the product of a and b.",
+      "evidence_ids": ["ev_002"],
+      "quote": "return a * b"
+    },
+    {
+      "claim_id": "c3",
+      "kind": "hypothesis",
+      "statement": "The operator in divide should be / rather than *.",
+      "evidence_ids": ["ev_002"]
+    }
+  ],
+  "root_cause_claim_id": "c2",
+  "confidence": "high",
+  "abstain": false
+}

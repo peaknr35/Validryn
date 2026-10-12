@@ -311,26 +311,35 @@ def test_paths_outside_the_worktree_never_become_evidence(project: Path, tmp_pat
 
 
 def test_symlink_cannot_escape_the_worktree(project: Path, tmp_path: Path) -> None:
-    outside_dir = tmp_path / "outside"
-    outside_dir.mkdir()
-    outside = outside_dir / "secret.py"
+    outside = tmp_path / "secret.py"
     outside.write_text("TOKEN = 'do-not-read'\n")
-    linked = "link.py"
     try:
         (project / "link.py").symlink_to(outside)
     except OSError:
-        # Windows without symlink rights: a directory junction needs none and escapes the same way.
-        if sys.platform != "win32":
-            pytest.skip("Cannot create symlinks here.")
-        subprocess.run(
-            ["cmd", "/c", "mklink", "/J", str(project / "linkdir"), str(outside_dir)],
-            check=True,
-            capture_output=True,
-        )
-        linked = "linkdir/secret.py"
-    assert (project / linked).read_text() == outside.read_text()
+        pytest.skip("Creating symlinks needs Developer Mode or elevated rights on this machine.")
 
-    bundle = build(project, failed_result("test_it.py::test_it", [(linked, 1, "leak")]))
+    bundle = build(project, failed_result("test_it.py::test_it", [("link.py", 1, "leak")]))
+
+    assert [item.path for item in bundle.evidence] == ["test_it.py"]
+    assert "do-not-read" not in bundle_json(bundle)
+    assert any("outside the worktree" in warning for warning in bundle.warnings)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Directory junctions exist only on Windows.")
+def test_junction_cannot_escape_the_worktree(project: Path, tmp_path: Path) -> None:
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+    (outside_dir / "secret.py").write_text("TOKEN = 'do-not-read'\n")
+    subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(project / "linkdir"), str(outside_dir)],
+        check=True,
+        capture_output=True,
+    )
+    assert (project / "linkdir" / "secret.py").exists()
+
+    bundle = build(
+        project, failed_result("test_it.py::test_it", [("linkdir/secret.py", 1, "leak")])
+    )
 
     assert [item.path for item in bundle.evidence] == ["test_it.py"]
     assert "do-not-read" not in bundle_json(bundle)

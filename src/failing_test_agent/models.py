@@ -55,6 +55,12 @@ ATTEMPT_TRANSITIONS: dict[AttemptStatus, set[AttemptStatus]] = {
         AttemptStatus.FAILED,
         AttemptStatus.INTERRUPTED,
     },
+    AttemptStatus.RETRIEVED: {AttemptStatus.DIAGNOSING},
+    AttemptStatus.DIAGNOSING: {
+        AttemptStatus.DIAGNOSED,
+        AttemptStatus.FAILED,
+        AttemptStatus.INTERRUPTED,
+    },
 }
 
 
@@ -126,6 +132,8 @@ class BaselineCapture(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+# `exact_match` is reserved for lexical search hits. Retrieval strategy
+# exact-v1 does not produce it; its absence from a bundle is not a bug.
 EvidenceKind = Literal["test_definition", "traceback_frame", "symbol_definition", "exact_match"]
 
 
@@ -166,6 +174,34 @@ class EvidenceBundle(BaseModel):
     evidence: list[EvidenceItem]
     warnings: list[str]
     truncated: bool = False
+
+
+class Claim(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    claim_id: str = Field(min_length=1)
+    # fact: stated by cited evidence. hypothesis: inferred. conflict: evidence
+    # disagrees. unknown: something the evidence does not show.
+    kind: Literal["fact", "hypothesis", "conflict", "unknown"]
+    statement: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(default_factory=list)
+    # Optional exact text copied from one of the cited evidence items.
+    quote: str | None = None
+
+
+class Diagnosis(BaseModel):
+    """A proposed explanation of the failure. Proposed by a provider, checked by `validate_diagnosis`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = 1
+    # Binds the diagnosis to one evidence bundle, so it cannot be reused on different evidence.
+    evidence_bundle_sha256: str
+    summary: str
+    claims: list[Claim]
+    root_cause_claim_id: str | None
+    confidence: Literal["low", "medium", "high"]
+    abstain: bool = False
 
 
 class CreatedRun(BaseModel):

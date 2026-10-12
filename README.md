@@ -80,6 +80,14 @@ Validryn is intentionally building this task loop before adding long-term memory
 - Is bounded: caps on items, lines per item, total bytes, and source file size, with a `truncated` flag.
 - Never reads outside the worktree: absolute paths, `..`, links that resolve elsewhere, `.git`, virtual environments, and binary files are skipped.
 
+**Diagnosis with a fake provider** (`fta attempt diagnose`)
+
+- A provider returns raw text; today the only provider reads a canned file. A real model will later fit the same slot and pass through the same checks.
+- The text must parse as JSON and match a strict schema: claims typed as fact, hypothesis, conflict, or unknown, each citing evidence IDs. Unknown fields are refused.
+- The diagnosis must name the hash of this attempt's evidence bundle, cite only evidence IDs that exist, give every fact at least one citation, and quote only text that appears word for word in the evidence it cites.
+- It must either name a root-cause claim or abstain with an `unknown` claim saying what is missing.
+- The raw output is always kept and hashed. A valid diagnosis is also stored in canonical form with a readable copy. An invalid one fails the attempt with one error code per broken rule.
+
 **Recovery**
 
 - Ctrl+C or an error during a stage marks the attempt `interrupted` or `failed`.
@@ -91,7 +99,7 @@ The following capabilities are planned but should not be considered available:
 
 - Docker-based security isolation (the backend interface exists; `run` is not implemented).
 - Lexical or semantic search beyond exact retrieval.
-- LLM-generated diagnoses or patches.
+- LLM-generated diagnoses (the stage accepts only canned input) and any patch generation.
 - Patch-policy enforcement.
 - Patched verification and per-test regression comparison.
 - Hash-bound human approval.
@@ -215,6 +223,18 @@ This needs a `captured` attempt whose worktree still matches the base commit, an
 
 Symbols that cannot be resolved produce a warning, not a failure. Retrieval fails only when the bundle could not be trusted, for example when the failing test cannot be found in the worktree.
 
+### Diagnose with a canned diagnosis
+
+```powershell
+fta attempt diagnose RUN_ID ATTEMPT_ID `
+  --provider fake `
+  --input .\fixtures\diagnoses\broken_calculator.json
+```
+
+This needs a `retrieved` attempt and moves it through `diagnosing` to `diagnosed`, or to `failed` (reason `invalid_diagnosis`) when a check rejects the output. It writes `diagnosis.raw.txt`, and for a valid diagnosis `diagnosis.json` and `diagnosis.md`. The command exits 0 when diagnosed, 1 when the diagnosis was rejected, and 2 when it refused to start.
+
+An evidence bundle's hash is unique to its attempt, so a canned file writes `{{evidence_bundle_sha256}}` where the hash belongs and the fake provider fills it in.
+
 ### Drives without file ownership
 
 If the project sits on a FAT32 or exFAT drive, Git refuses to use repositories there until the folder is listed as safe:
@@ -234,12 +254,12 @@ pytest
 
 The remaining V1 increments, in order:
 
-1. Fake diagnosis output that cites evidence IDs, validated against the bundle.
-2. Fake patch output.
-3. Host-side patch validation and application.
-4. Patched verification with per-test outcome comparison.
-5. Hash-bound review and approval.
-6. Real model provider.
+1. Fake patch proposal with host-side patch-policy validation and application.
+2. Patched verification with per-test outcome comparison.
+3. Hash-bound review and approval.
+4. Real model provider.
+
+The design behind this order is in [docs/architecture.md](docs/architecture.md).
 
 The Docker backend is implemented against the existing contract as soon as a container runtime is available.
 
@@ -269,6 +289,7 @@ Validryn must never silently fall back from isolated execution to unsafe local e
 - [x] Baseline verification
 - [x] Exact evidence retrieval
 - [x] Recovery of attempts whose process was killed
+- [x] Fake diagnosis stage with evidence-bound validation
 - [ ] Restricted Docker execution
 - [ ] Fake diagnosis and patch stages
 - [ ] Patch validation and policy enforcement

@@ -8,7 +8,8 @@ import typer
 
 from .backends import select_backend
 from .capture import capture_baseline
-from .errors import FTAError
+from .diagnosis import FakeDiagnosisProvider, diagnose
+from .errors import CommandValidationError, FTAError
 from .retrieval import retrieve_evidence
 from .service import create_run
 from .stages import reconcile_lost_attempts
@@ -129,6 +130,51 @@ def attempt_retrieve(run_id: str, attempt_id: str) -> None:
     typer.echo("Attempt state:               retrieved")
     for warning in bundle.warnings:
         typer.echo(f"Warning:                     {warning}")
+
+
+@attempt_app.command("diagnose")
+def attempt_diagnose(
+    run_id: str,
+    attempt_id: str,
+    provider: str = typer.Option("fake", "--provider", help="Only `fake` exists so far."),
+    input_path: Path = typer.Option(
+        None, "--input", exists=True, dir_okay=False, help="Canned diagnosis for the fake provider."
+    ),
+) -> None:
+    """Validate a proposed diagnosis against the evidence bundle and record it."""
+    try:
+        if provider != "fake":
+            raise CommandValidationError(f"Unknown diagnosis provider: {provider}")
+        if input_path is None:
+            raise CommandValidationError("The fake provider needs --input FILE.")
+        outcome = diagnose(app_home(), run_id, attempt_id, FakeDiagnosisProvider(input_path))
+    except FTAError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    typer.echo(f"Provider:                    {outcome.provider}")
+    typer.echo(f"Evidence bundle:             {outcome.evidence_bundle_sha256}")
+    typer.echo(f"Diagnosis valid:             {_yes_no(outcome.valid)}")
+    if not outcome.valid:
+        for problem in outcome.problems:
+            typer.echo(f"Problem [{problem.code}]: {problem.message}")
+        typer.echo("Raw output kept:             artifacts/diagnosis.raw.txt")
+        typer.echo("Attempt state:               failed (invalid_diagnosis)")
+        raise typer.Exit(code=1)
+    diagnosis = outcome.diagnosis
+    kinds = [claim.kind for claim in diagnosis.claims]
+    counts = ", ".join(f"{kinds.count(kind)} {kind}" for kind in dict.fromkeys(kinds))
+    root = next(
+        (c for c in diagnosis.claims if c.claim_id == diagnosis.root_cause_claim_id), None
+    )
+    typer.echo(f"Claims:                      {len(kinds)} ({counts})")
+    typer.echo(
+        f"Root cause:                  "
+        f"{f'{root.claim_id}: {root.statement}' if root else 'none (abstained)'}"
+    )
+    typer.echo(f"Confidence:                  {diagnosis.confidence}")
+    typer.echo("Diagnosis:                   artifacts/diagnosis.json")
+    typer.echo("Attempt state:               diagnosed")
 
 
 if __name__ == "__main__":
