@@ -1,37 +1,77 @@
-# Failing Test Agent — Deterministic Foundation
+# Failing Test Agent
 
-This repository implements only the first V1 acceptance slice:
+An auditable failing-test agent, built one deterministic slice at a time. Two slices exist so far.
 
-```bash
-fta run create \
-  --repo ./fixtures/broken_calculator \
-  --test "pytest tests/test_calculator.py::test_divide"
+**Run creation.** `fta run create` validates a clean Git repository, records `HEAD`, creates attempt 1 in a detached Git worktree, atomically writes `manifest.json` and `events.jsonl`, and commits the run, attempt, events, and manifest artifact to SQLite in one transaction.
+
+**Test execution (library only, no CLI yet).** An `ExecutionBackend` interface with a `TrustedLocalBackend` that runs Pytest with a timeout, bounded output, process-tree cleanup, and machine-readable per-test results.
+
+It does **not** yet capture a baseline for a run, retrieve evidence, call an LLM, generate a patch, or approve changes.
+
+## Setup (Windows PowerShell)
+
+```powershell
+py -3.14 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+pytest
 ```
 
-It validates a clean Git repository, records `HEAD`, creates attempt 1 in a detached Git worktree, atomically writes `manifest.json` and `events.jsonl`, and commits the run, attempt, events, and manifest artifact to SQLite in one transaction.
-
-It does **not** execute tests, retrieve evidence, call an LLM, generate a patch, or approve changes.
-
-## Setup
+## Setup (bash)
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
-bash scripts/init-fixture.sh
 pytest
 ```
 
-## Run
+## Create a run
+
+The tracked fixture in `fixtures/broken_calculator` is plain files. The init script copies it to `.fta/fixtures/broken_calculator` and makes that copy a Git repository.
+
+```powershell
+.\scripts\init-fixture.ps1
+$env:FTA_HOME = "$PWD\.fta"
+fta run create `
+  --repo .\.fta\fixtures\broken_calculator `
+  --test "pytest tests/test_calculator.py::test_divide"
+```
 
 ```bash
+bash scripts/init-fixture.sh
 export FTA_HOME="$PWD/.fta"
 fta run create \
-  --repo ./fixtures/broken_calculator \
+  --repo ./.fta/fixtures/broken_calculator \
   --test "pytest tests/test_calculator.py::test_divide"
 ```
 
 The command prints the run ID, attempt ID, base commit, detached worktree path, and manifest path.
+
+If the project sits on a drive that does not record file ownership (FAT32, exFAT), Git refuses to use repositories there until the folder is listed as safe:
+
+```powershell
+git config --global --add safe.directory "D:/path/to/failing-test-agent"
+git config --global --add safe.directory "D:/path/to/failing-test-agent/*"
+```
+
+## Execution backends
+
+| Backend | Status | Isolation |
+|---|---|---|
+| `docker` | Interface only; `run` is not implemented | Intended default for unknown repositories |
+| `trusted-local` | Implemented | **None.** Not a sandbox |
+
+`trusted-local` runs repository code with the permissions of your user account. It can read your files, use the network, and start processes. `select_backend` returns it only when called with `allow_unsafe_local_execution=True`, and selecting `docker` on a machine without Docker raises an error; there is no fallback from Docker to local.
+
+What `trusted-local` does provide:
+
+- A wall-clock timeout and cancellation from another thread, both ending the whole process tree (a Job Object on Windows, the process group elsewhere).
+- Captured stdout and stderr capped at configured byte limits; the excess is discarded, not stored.
+- A minimal environment: only the variables Python needs to start, plus the ones the request names.
+- Per-test results from a bundled Pytest plugin (`failing_test_agent.pytest_reporter`), cross-checked against Pytest's exit code. A report that disagrees with the exit code yields `execution_error`.
+- `intended_tests_executed`, true only when each requested node ID was collected and its body ran; skipped, deselected, and missing tests do not count.
+- `command_environment_sha256`, comparable between a baseline command and its patched twin. It ignores the per-attempt worktree path.
 
 ## Enforced invariants
 
@@ -42,11 +82,12 @@ The command prints the run ID, attempt ID, base commit, detached worktree path, 
 - Attempt 1 is the only current attempt.
 - SQLite foreign keys are enabled on every connection.
 - Event history exists in both SQLite and readable JSONL.
+- Local execution requires explicit consent and Docker selection fails closed.
 
 ## Next implementation order
 
-1. Container execution with read-only source mounts, timeout, bounded output, and cleanup.
-2. Baseline target and regression verification using machine-readable Pytest results.
+1. Docker backend with read-only source mounts, behind the same interface.
+2. Baseline target and regression verification for a run (`fta attempt capture`).
 3. Exact retrieval.
 4. Fake diagnosis and patch outputs.
 5. Host-side patch validation and application.

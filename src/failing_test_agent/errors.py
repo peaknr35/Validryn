@@ -16,3 +16,11 @@ class WorktreeCreationError(FTAError):
 
 class CommandValidationError(FTAError):
     """The configured test command is outside the V1 contract."""
+
+
+class BackendUnavailableError(FTAError):
+    """The selected execution backend cannot run commands on this machine."""
+
+
+class UnsafeExecutionConsentError(FTAError):
+    """Trusted-local execution was requested without explicit consent."""
