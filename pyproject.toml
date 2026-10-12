@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "failing-test-agent"
+version = "0.1.0"
+description = "Deterministic foundation for an auditable failing-test agent"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2.11,<3",
+  "typer>=0.15,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3,<9"]
+
+[project.scripts]
+fta = "failing_test_agent.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/failing_test_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
