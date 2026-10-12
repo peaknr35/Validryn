@@ -10,18 +10,18 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from failing_test_agent.capture import capture_baseline
+from failing_test_agent.stages.capture import capture_baseline
 from failing_test_agent.cli import app
-from failing_test_agent.db import Database
-from failing_test_agent.docker_backend import DockerBackend
-from failing_test_agent.errors import StateError
-from failing_test_agent.execution import ExecutionRequest, ExecutionResult
-from failing_test_agent.hashing import sha256_file
-from failing_test_agent.local_backend import TrustedLocalBackend
-from failing_test_agent.models import CreatedRun
-from failing_test_agent.liveness import process_start_token
-from failing_test_agent.service import create_run
-from failing_test_agent.stages import reconcile_lost_attempts
+from failing_test_agent.core.db import Database
+from failing_test_agent.execution.docker_backend import DockerBackend
+from failing_test_agent.core.errors import StateError
+from failing_test_agent.execution.contracts import ExecutionRequest, ExecutionResult
+from failing_test_agent.core.hashing import sha256_file
+from failing_test_agent.execution.local_backend import TrustedLocalBackend
+from failing_test_agent.core.models import CreatedRun
+from failing_test_agent.core.liveness import process_start_token
+from failing_test_agent.stages.create import create_run
+from failing_test_agent.core.lifecycle import reconcile_lost_attempts
 
 TARGET = "pytest test_calculator.py::test_divide"
 

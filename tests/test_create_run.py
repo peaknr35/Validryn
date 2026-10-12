@@ -9,8 +9,8 @@ import pytest
 from typer.testing import CliRunner
 
 from failing_test_agent.cli import app
-from failing_test_agent.errors import DirtyRepositoryError, WorktreeCreationError
-from failing_test_agent.service import create_run
+from failing_test_agent.core.errors import DirtyRepositoryError, WorktreeCreationError
+from failing_test_agent.stages.create import create_run
 
 
 def git(repo: Path, *args: str) -> str:

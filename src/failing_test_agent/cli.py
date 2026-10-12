@@ -6,13 +6,13 @@ from pathlib import Path
 
 import typer
 
-from .backends import select_backend
-from .capture import capture_baseline
-from .diagnosis import FakeDiagnosisProvider, diagnose
-from .errors import CommandValidationError, FTAError
-from .retrieval import retrieve_evidence
-from .service import create_run
-from .stages import reconcile_lost_attempts
+from .execution.backends import select_backend
+from .stages.capture import capture_baseline
+from .stages.diagnose import FakeDiagnosisProvider, diagnose
+from .core.errors import CommandValidationError, FTAError
+from .stages.retrieve import retrieve_evidence
+from .stages.create import create_run
+from .core.lifecycle import reconcile_lost_attempts
 
 app = typer.Typer(help="Auditable failing-test agent foundation.")
 run_app = typer.Typer(help="Create and inspect runs.")

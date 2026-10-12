@@ -1,6 +1,6 @@
 """Pytest plugin that writes per-test results as JSON.
 
-Loaded with ``-p failing_test_agent.pytest_reporter`` inside the process that
+Loaded with ``-p failing_test_agent.execution.pytest_reporter`` inside the process that
 runs the target tests, so it uses only the standard library and Pytest. It is inactive
 unless ``FTA_PYTEST_REPORT`` names the file to write.
 

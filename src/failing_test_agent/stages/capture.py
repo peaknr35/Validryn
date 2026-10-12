@@ -3,18 +3,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .db import Database
-from .execution import ExecutionBackend, ExecutionRequest, ExecutionResult
-from .local_backend import node_matches
-from .models import AttemptStatus, BaselineCapture, CommandCapture
-from .stages import (
+from ..core.db import Database
+from ..execution.contracts import ExecutionBackend, ExecutionRequest, ExecutionResult
+from ..execution.local_backend import node_matches
+from ..core.models import AttemptStatus, BaselineCapture, CommandCapture
+from ..core.lifecycle import (
     Recorder,
     load_current_attempt,
     new_id,
     require_pristine_worktree,
     stage_guard,
 )
-from .worktree import worktree_inventory
+from ..core.worktree import worktree_inventory
 
 _FAILING_OUTCOMES = {"failed", "error"}
 # A regression baseline with one of these statuses still lists per-test outcomes to compare against.

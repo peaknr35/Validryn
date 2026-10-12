@@ -12,11 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from failing_test_agent.backends import select_backend
-from failing_test_agent.docker_backend import DockerBackend
-from failing_test_agent.errors import BackendUnavailableError, UnsafeExecutionConsentError
-from failing_test_agent.execution import ExecutionRequest
-from failing_test_agent.local_backend import (
+from failing_test_agent.execution.backends import select_backend
+from failing_test_agent.execution.docker_backend import DockerBackend
+from failing_test_agent.core.errors import BackendUnavailableError, UnsafeExecutionConsentError
+from failing_test_agent.execution.contracts import ExecutionRequest
+from failing_test_agent.execution.local_backend import (
     BoundedReader,
     PytestReport,
     TrustedLocalBackend,

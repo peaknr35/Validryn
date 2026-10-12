@@ -9,9 +9,9 @@ from typing import Callable
 import pytest
 from typer.testing import CliRunner
 
-from failing_test_agent.capture import capture_baseline
+from failing_test_agent.stages.capture import capture_baseline
 from failing_test_agent.cli import app
-from failing_test_agent.diagnosis import (
+from failing_test_agent.stages.diagnose import (
     BUNDLE_HASH_PLACEHOLDER,
     MAX_CLAIMS,
     MAX_STATEMENT_CHARS,
@@ -20,12 +20,12 @@ from failing_test_agent.diagnosis import (
     diagnosis_json,
     validate_diagnosis,
 )
-from failing_test_agent.errors import StateError
-from failing_test_agent.hashing import sha256_file
-from failing_test_agent.local_backend import TrustedLocalBackend
-from failing_test_agent.models import CreatedRun, EvidenceBundle, EvidenceItem
-from failing_test_agent.retrieval import retrieve_evidence
-from failing_test_agent.service import create_run
+from failing_test_agent.core.errors import StateError
+from failing_test_agent.core.hashing import sha256_file
+from failing_test_agent.execution.local_backend import TrustedLocalBackend
+from failing_test_agent.core.models import CreatedRun, EvidenceBundle, EvidenceItem
+from failing_test_agent.stages.retrieve import retrieve_evidence
+from failing_test_agent.stages.create import create_run
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "fixtures" / "broken_calculator"

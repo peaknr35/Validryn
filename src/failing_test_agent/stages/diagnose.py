@@ -15,11 +15,11 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
-from .db import Database
-from .errors import StateError
-from .hashing import sha256_file
-from .models import AttemptStatus, Diagnosis, EvidenceBundle
-from .stages import Recorder, load_current_attempt, stage_guard
+from ..core.db import Database
+from ..core.errors import StateError
+from ..core.hashing import sha256_file
+from ..core.models import AttemptStatus, Diagnosis, EvidenceBundle
+from ..core.lifecycle import Recorder, load_current_attempt, stage_guard
 
 MAX_RAW_BYTES = 200_000
 MAX_CLAIMS = 20

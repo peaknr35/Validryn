@@ -17,13 +17,13 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from . import pytest_reporter
 from .environment import command_environment_identity, command_environment_sha256
-from .errors import CommandValidationError
-from .execution import CaseResult, ExecutionRequest, ExecutionResult, ExecutionStatus
-from .hashing import sha256_file
+from ..core.errors import CommandValidationError
+from .contracts import CaseResult, ExecutionRequest, ExecutionResult, ExecutionStatus
+from ..core.hashing import sha256_file
 from .process_tree import ProcessTree
 
 # cacheprovider is disabled so a run does not write .pytest_cache into the worktree.
-INJECTED_PYTEST_ARGS = ["-p", "failing_test_agent.pytest_reporter", "-p", "no:cacheprovider"]
+INJECTED_PYTEST_ARGS = ["-p", "failing_test_agent.execution.pytest_reporter", "-p", "no:cacheprovider"]
 
 # Host variables a Python subprocess needs to start. Nothing else is inherited:
 # no home directory, profile, or credential variables.

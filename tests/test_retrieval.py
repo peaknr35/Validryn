@@ -10,16 +10,16 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from failing_test_agent import retrieval
-from failing_test_agent.capture import capture_baseline
+from failing_test_agent.stages import retrieve as retrieval
+from failing_test_agent.stages.capture import capture_baseline
 from failing_test_agent.cli import app
-from failing_test_agent.errors import StateError
-from failing_test_agent.execution import CaseResult, ExecutionResult, FailureLocation
-from failing_test_agent.hashing import sha256_file
-from failing_test_agent.local_backend import TrustedLocalBackend
-from failing_test_agent.models import CreatedRun, EvidenceBundle
-from failing_test_agent.retrieval import build_evidence, bundle_json, retrieve_evidence
-from failing_test_agent.service import create_run
+from failing_test_agent.core.errors import StateError
+from failing_test_agent.execution.contracts import CaseResult, ExecutionResult, FailureLocation
+from failing_test_agent.core.hashing import sha256_file
+from failing_test_agent.execution.local_backend import TrustedLocalBackend
+from failing_test_agent.core.models import CreatedRun, EvidenceBundle
+from failing_test_agent.stages.retrieve import build_evidence, bundle_json, retrieve_evidence
+from failing_test_agent.stages.create import create_run
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "broken_calculator"
 FIXTURE_TARGET = "pytest tests/test_calculator.py::test_divide"

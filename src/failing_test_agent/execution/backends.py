@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from .docker_backend import DockerBackend
-from .errors import BackendUnavailableError, CommandValidationError, UnsafeExecutionConsentError
-from .execution import ExecutionBackend
+from ..core.errors import BackendUnavailableError, CommandValidationError, UnsafeExecutionConsentError
+from .contracts import ExecutionBackend
 from .local_backend import TrustedLocalBackend
 
 LOCAL_EXECUTION_WARNING = (

@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .execution import ExecutionRequest
-from .hashing import sha256_canonical_json
+from .contracts import ExecutionRequest
+from ..core.hashing import sha256_canonical_json
 
 WORKTREE_PLACEHOLDER = "<worktree>"
 

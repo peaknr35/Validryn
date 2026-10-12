@@ -15,14 +15,14 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from .db import Database
-from .errors import FTAError, StateError
-from .execution import CaseResult, ExecutionResult
-from .hashing import sha256_file
-from .local_backend import node_matches
-from .models import AttemptStatus, EvidenceBundle, EvidenceItem
-from .stages import Recorder, load_current_attempt, require_pristine_worktree, stage_guard
-from .worktree import worktree_inventory
+from ..core.db import Database
+from ..core.errors import FTAError, StateError
+from ..execution.contracts import CaseResult, ExecutionResult
+from ..core.hashing import sha256_file
+from ..execution.local_backend import node_matches
+from ..core.models import AttemptStatus, EvidenceBundle, EvidenceItem
+from ..core.lifecycle import Recorder, load_current_attempt, require_pristine_worktree, stage_guard
+from ..core.worktree import worktree_inventory
 
 MAX_EVIDENCE_ITEMS = 30
 MAX_LINES_PER_ITEM = 80

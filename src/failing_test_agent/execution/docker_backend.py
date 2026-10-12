@@ -3,8 +3,8 @@ from __future__ import annotations
 import shutil
 import subprocess
 
-from .errors import BackendUnavailableError
-from .execution import ExecutionRequest, ExecutionResult
+from ..core.errors import BackendUnavailableError
+from .contracts import ExecutionRequest, ExecutionResult
 
 
 class DockerBackend:
