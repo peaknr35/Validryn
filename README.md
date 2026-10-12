@@ -1,45 +1,167 @@
 # Validryn
 
-*Intelligence you can inspect, verify, and trust.*
+**Intelligence you can inspect, verify, and trust.**
 
-Validryn is an auditable agent workbench: validated runs, verified evidence, human-approved decisions, and (later) controlled memory. Its first workflow is a failing-test agent, built one deterministic slice at a time. The Python package is `failing_test_agent` and the command is `fta`. Three slices exist so far.
+Validryn is a workbench for auditable AI-assisted software investigation. It turns failing tests into reproducible investigation runs with isolated attempts, structured evidence, deterministic verification, and human approval.
 
-**Run creation.** `fta run create` validates a clean Git repository, records `HEAD`, creates attempt 1 in a detached Git worktree, atomically writes `manifest.json` and `events.jsonl`, and commits the run, attempt, events, and manifest artifact to SQLite in one transaction.
+> **Project status:** Early V1 development. Validryn currently creates runs, executes Pytest through a trusted-local backend, and captures a baseline on the unpatched commit. It does not yet diagnose failures, generate patches, or execute untrusted repository code in a security sandbox.
 
-**Test execution.** An `ExecutionBackend` interface with a `TrustedLocalBackend` that runs Pytest with a timeout, bounded output, process-tree cleanup, and machine-readable per-test results.
+## Why Validryn
 
-**Baseline capture.** `fta attempt capture` runs the target test, and the regression command if one is configured, on the unpatched base commit and records what happened.
+Most coding agents optimize for producing an answer or patch quickly. Validryn is being designed around a different question:
 
-It does **not** yet retrieve evidence, call an LLM, generate a patch, or approve changes.
+> Can every important result be reproduced, inspected, verified, and tied to the exact evidence and human decision that produced it?
 
-## Setup (Windows PowerShell)
+The project separates responsibilities deliberately:
+
+- Models may propose diagnoses and patches.
+- Deterministic Python code controls state transitions and validation.
+- Execution backends run explicitly allowed commands.
+- Artifacts preserve evidence, outputs, and history.
+- Humans approve or reject exact, hash-bound results.
+- Only validated experiences may later become reusable memory.
+
+## Current Scope
+
+The first workflow focuses on one measurable task:
+
+```text
+failing Pytest target
+        ↓
+capture repository snapshot
+        ↓
+gather relevant evidence
+        ↓
+propose diagnosis and patch
+        ↓
+verify target and regressions
+        ↓
+human review
+        ↓
+record a trustworthy episode
+```
+
+Validryn is intentionally building this task loop before adding long-term memory, semantic retrieval, autonomous learning, or multi-agent coordination.
+
+## Implemented
+
+**Run creation** (`fta run create`)
+
+- Creates a run from a clean Git repository and records the exact base commit.
+- Creates attempt 1 in a detached Git worktree.
+- Writes a versioned run manifest and an event history, atomically.
+- Persists runs, attempts, events, and artifact hashes in SQLite in one transaction.
+- Rejects dirty repositories without modifying the developer's checkout.
+- Cleans up incomplete state when worktree creation fails.
+
+**Test execution** (`ExecutionBackend`, `TrustedLocalBackend`)
+
+- A wall-clock timeout and cancellation from another thread, both ending the whole process tree (a Job Object on Windows, the process group elsewhere).
+- Captured stdout and stderr capped at configured byte limits; the excess is discarded, not stored.
+- A minimal environment: only the variables Python needs to start, plus the ones the request names.
+- Per-test results from a bundled Pytest plugin, cross-checked against Pytest's exit code. A report that disagrees with the exit code yields `execution_error`.
+- `intended_tests_executed`, true only when each requested node ID was collected and its body ran; skipped, deselected, and missing tests do not count.
+- A per-command environment hash, comparable between a baseline command and its patched twin.
+
+**Baseline capture** (`fta attempt capture`)
+
+- Runs the target test, and the regression command if one is configured, on the unpatched base commit.
+- Confirms the requested test actually ran and failed there.
+- Records which tests already fail before any patch exists.
+- Checks that execution left the worktree unchanged.
+- Moves the attempt through an allowed-transition table and records hashed artifacts and events.
+
+## Not Implemented Yet
+
+The following capabilities are planned but should not be considered available:
+
+- Docker-based security isolation (the backend interface exists; `run` is not implemented).
+- Repository evidence retrieval.
+- LLM-generated diagnoses or patches.
+- Patch-policy enforcement.
+- Patched verification and per-test regression comparison.
+- Hash-bound human approval.
+- Attempt revision and recovery of attempts left mid-capture by a killed process.
+- Episodic memory retrieval.
+- Lesson proposal, validation, and promotion.
+
+## Architecture
+
+Validryn separates the platform into five conceptual areas:
+
+| Area | Responsibility |
+|---|---|
+| **Validryn Run** | Reproducible runs, attempts, state transitions, and recovery |
+| **Validryn Evidence** | Source-linked evidence bundles and claim provenance |
+| **Validryn Review** | Human inspection, approval, rejection, and correction capture |
+| **Validryn Memory** | Previous episodes, approved facts, and scoped procedures |
+| **Validryn Evaluate** | Regression suites, lesson validation, and system evaluation |
+
+The initial implementation uses:
+
+- Python 3.12+
+- Typer for the CLI
+- Pydantic for structured contracts
+- SQLite for run metadata and event records
+- Git worktrees for reproducible repository snapshots
+- Pytest for acceptance tests
+
+A Git worktree isolates the source checkout but is **not** a security sandbox. Untrusted tests must eventually run through a restricted execution backend rather than directly on the host.
+
+## Project Layout
+
+```text
+validryn/
+├── fixtures/
+│   └── broken_calculator/
+├── scripts/
+├── src/
+│   └── failing_test_agent/
+├── tests/
+├── pyproject.toml
+└── README.md
+```
+
+The Python package and CLI still use the temporary `failing_test_agent` and `fta` names. They will be migrated carefully after the V1 execution contracts are stable.
+
+## Getting Started
+
+### Requirements
+
+- Python 3.12 or newer
+- Git
+
+### Windows PowerShell
 
 ```powershell
-py -3.14 -m venv .venv
+py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 pytest
 ```
 
-## Setup (bash)
+### Linux and macOS
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -e '.[dev]'
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
 pytest
 ```
 
-## Create a run
+### Create a run
 
-The tracked fixture in `fixtures/broken_calculator` is plain files. The init script copies it to `.fta/fixtures/broken_calculator` and makes that copy a Git repository.
+The tracked fixture in `fixtures/broken_calculator` is plain files. The init script copies it to `.fta/fixtures/broken_calculator` and makes that copy a Git repository, so the main repository never contains a nested one.
 
 ```powershell
 .\scripts\init-fixture.ps1
 $env:FTA_HOME = "$PWD\.fta"
 fta run create `
   --repo .\.fta\fixtures\broken_calculator `
-  --test "pytest tests/test_calculator.py::test_divide"
+  --test "pytest tests/test_calculator.py::test_divide" `
+  --regression "pytest"
 ```
 
 ```bash
@@ -47,14 +169,13 @@ bash scripts/init-fixture.sh
 export FTA_HOME="$PWD/.fta"
 fta run create \
   --repo ./.fta/fixtures/broken_calculator \
-  --test "pytest tests/test_calculator.py::test_divide"
+  --test "pytest tests/test_calculator.py::test_divide" \
+  --regression "pytest"
 ```
 
-The command prints the run ID, attempt ID, base commit, detached worktree path, and manifest path.
+The command prints the run ID, attempt ID, base commit, detached worktree path, and manifest path. `--regression` is optional.
 
-Add `--regression "pytest"` to `run create` to configure a regression command for the run.
-
-## Capture the baseline
+### Capture the baseline
 
 ```powershell
 fta attempt capture RUN_ID ATTEMPT_ID `
@@ -68,55 +189,114 @@ Without `--backend`, the command selects Docker and stops if Docker is unavailab
 - `failed`: the test passed, did not run, could not be collected, timed out, or execution changed files in the worktree. The reason is recorded.
 - `interrupted`: the capture was stopped with Ctrl+C.
 
-A captured attempt has three files in `attempts/001/artifacts/`, each hashed and registered in SQLite: `baseline-target.json` and `baseline-regression.json` (full per-test results) and `baseline.json` (the summary, including which tests already fail before any patch). The command exits 0 when captured, 1 when the attempt failed, and 2 when it refused to start.
+A captured attempt has three files in `attempts/001/artifacts/`, each hashed and registered in SQLite: `baseline-target.json` and `baseline-regression.json` (full per-test results) and `baseline.json` (the summary). The command exits 0 when captured, 1 when the attempt failed, and 2 when it refused to start.
 
-If the process is killed outright during a capture, the attempt stays in `capturing`; startup reconciliation for that case is not built yet.
+### Drives without file ownership
 
-If the project sits on a drive that does not record file ownership (FAT32, exFAT), Git refuses to use repositories there until the folder is listed as safe:
+If the project sits on a FAT32 or exFAT drive, Git refuses to use repositories there until the folder is listed as safe:
 
 ```powershell
-git config --global --add safe.directory "D:/path/to/failing-test-agent"
-git config --global --add safe.directory "D:/path/to/failing-test-agent/*"
+git config --global --add safe.directory "D:/path/to/validryn"
+git config --global --add safe.directory "D:/path/to/validryn/*"
 ```
 
-## Execution backends
+## Development
 
-| Backend | Status | Isolation |
-|---|---|---|
-| `docker` | Interface only; `run` is not implemented | Intended default for unknown repositories |
-| `trusted-local` | Implemented | **None.** Not a sandbox |
+Run the acceptance suite:
 
-`trusted-local` runs repository code with the permissions of your user account. It can read your files, use the network, and start processes. `select_backend` returns it only when called with `allow_unsafe_local_execution=True`, and selecting `docker` on a machine without Docker raises an error; there is no fallback from Docker to local.
+```bash
+pytest
+```
 
-What `trusted-local` does provide:
+The remaining V1 increments, in order:
 
-- A wall-clock timeout and cancellation from another thread, both ending the whole process tree (a Job Object on Windows, the process group elsewhere).
-- Captured stdout and stderr capped at configured byte limits; the excess is discarded, not stored.
-- A minimal environment: only the variables Python needs to start, plus the ones the request names.
-- Per-test results from a bundled Pytest plugin (`failing_test_agent.pytest_reporter`), cross-checked against Pytest's exit code. A report that disagrees with the exit code yields `execution_error`.
-- `intended_tests_executed`, true only when each requested node ID was collected and its body ran; skipped, deselected, and missing tests do not count.
-- `command_environment_sha256`, comparable between a baseline command and its patched twin. It ignores the per-attempt worktree path.
-
-## Enforced invariants
-
-- Dirty repositories are rejected before application state is created.
-- The user's branch and working files are not modified.
-- A run is recorded as active only after its detached worktree and artifacts exist.
-- Failed worktree creation is cleaned up and cannot leave an active run or attempt.
-- Attempt 1 is the only current attempt.
-- SQLite foreign keys are enabled on every connection.
-- Event history exists in both SQLite and readable JSONL.
-- Local execution requires explicit consent and Docker selection fails closed.
-- Attempt states change only through an allowed-transition table, checked inside the database transaction.
-- A baseline is captured only on a clean worktree at the recorded base commit, and only for the current attempt of an active run.
-
-## Next implementation order
-
-1. Exact retrieval.
+1. Exact evidence retrieval from the attempt worktree.
 2. Fake diagnosis and patch outputs.
 3. Host-side patch validation and application.
-4. Patched verification with per-node outcome comparison.
+4. Patched verification with per-test outcome comparison.
 5. Hash-bound review and approval.
 6. Real model provider.
 
-Independent of that order: the Docker backend with read-only source mounts, behind the same interface, once Docker is available.
+The Docker backend is implemented against the existing contract as soon as a container runtime is available.
+
+Validryn must never silently fall back from isolated execution to unsafe local execution.
+
+## Design Principles
+
+- **Evidence before assertion:** Important findings should point to inspectable source material.
+- **Reproducibility before autonomy:** Each attempt begins from a known repository snapshot.
+- **Deterministic enforcement:** Application code—not model text—enforces permissions and transitions.
+- **Fresh stage context:** Workflow stages receive only their declared inputs and references.
+- **Human-controlled action:** Analysis never implies permission to merge, deploy, or communicate externally.
+- **Exact approvals:** A decision applies only to the reviewed commit, diff, evidence, and verification bundle.
+- **Learning by promotion:** A successful attempt is an episode, not automatically a universal lesson.
+- **Reversibility:** Attempts, decisions, memories, and promoted lessons retain history and support rollback.
+
+## Roadmap
+
+- [x] Deterministic run and attempt creation
+- [x] Clean-repository enforcement
+- [x] Detached-worktree snapshot
+- [x] Atomic manifests and event records
+- [x] Transactional SQLite persistence
+- [x] Execution backend contracts
+- [x] Trusted local fixture runner
+- [x] Machine-readable Pytest results
+- [x] Baseline verification
+- [ ] Restricted Docker execution
+- [ ] Evidence retrieval
+- [ ] Fake diagnosis and patch stages
+- [ ] Patch validation and policy enforcement
+- [ ] Patched-target and per-test regression comparison
+- [ ] Hash-bound review and approval
+- [ ] Real model integration
+- [ ] Episodic memory retrieval
+- [ ] Validated lesson promotion
+
+## Security
+
+Validryn is experimental software and should not currently execute code from untrusted repositories.
+
+The only working backend, `trusted-local`, runs repository code with the permissions of your user account. It bounds time and captured output and cleans up the process tree, but it isolates nothing: that code can read your files, use the network, and start processes. It is returned only with explicit consent (`--allow-unsafe-local-execution`), and selecting Docker on a machine without Docker is an error rather than a fallback.
+
+A detached Git worktree provides reproducibility and protects the primary checkout from ordinary modifications, but it does not prevent repository code from reading credentials, accessing the network, spawning processes, or modifying files elsewhere on the host. The planned Docker backend will enforce network, filesystem, capability, process, memory, CPU, and timeout restrictions.
+
+If a vulnerability is discovered, do not open a public issue containing exploit details. Contact the maintainer privately through the repository owner's GitHub profile until a dedicated security policy and contact channel are published.
+
+## Contributing
+
+Validryn is in early architectural development. Small, test-backed contributions are preferred over broad framework changes.
+
+Before opening a pull request:
+
+- Keep changes within the current milestone.
+- Add or update acceptance tests.
+- Preserve deterministic behavior.
+- Do not introduce automatic execution, deployment, or self-modifying workflows.
+- Explain any state, schema, security, or compatibility implications.
+
+A formal contributing guide and code of conduct will be added before broader community contribution begins.
+
+## License
+
+No license has been selected yet. Until a license file is added, the source is publicly visible but no open-source permissions are granted.
+
+## Vision
+
+Validryn is intended to become an evidence-to-action workbench where AI-assisted work remains inspectable at every stage:
+
+```text
+knowledge retrieval
+        +
+versioned workflow contracts
+        +
+deterministic execution
+        +
+evidence lineage
+        +
+human approval
+        +
+validated memory
+```
+
+The long-term goal is not an agent that merely acts independently. It is a system that becomes more useful without becoming less accountable.

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "failing-test-agent"
 version = "0.1.0"
-description = "Validryn: an auditable failing-test agent"
+description = "An auditable AI workbench for investigating failures, verifying changes, and learning from human-approved outcomes."
 requires-python = ">=3.12"
 dependencies = [
   "pydantic>=2.11,<3",
